@@ -20,7 +20,7 @@
     {
       "label": "Start Backend",
       "type": "shell",
-      "command": "npm run dev",
+      "command": "npm install && npm run dev",
       "options": { "cwd": "${workspaceFolder}/backend" },
       "isBackground": true,
       "problemMatcher": [],
@@ -33,7 +33,7 @@
     {
       "label": "Start Frontend",
       "type": "shell",
-      "command": "npm start",
+      "command": "npm install && npm start",
       "options": { "cwd": "${workspaceFolder}/frontend" },
       "isBackground": true,
       "problemMatcher": [],
