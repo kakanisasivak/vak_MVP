@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LangProvider } from './context/LangContext';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -25,6 +26,7 @@ function ProtectedRoute({ children, requiredRole }) {
 export default function App() {
   return (
     <AuthProvider>
+      <LangProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -57,6 +59,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </LangProvider>
     </AuthProvider>
   );
 }

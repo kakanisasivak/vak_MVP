@@ -145,33 +145,29 @@ db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?, ?)
 `).run(node5Id, cluster2Id, 'for loops and while loops', 'Repeating actions and iterating over sequences', 2, 2, 'applied');
 
-// ─── 6. Engagements ──────────────────────────────────────────────────────────
-const engagementHindiId = uuidv4();
-const engagementTeluguId = uuidv4();
+// ─── 6. ONE Engagement (language per-learner, not per-engagement) ─────────────
+// Both Hindi and Telugu learners share one engagement.
+// The learner's own language record determines their AI instruction language.
+const engagementId = uuidv4();
 
 db.prepare(`
   INSERT INTO engagements (id, institution_id, capability_target_id, title, language, status, started_at)
   VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-`).run(engagementHindiId, instId, ctId, 'Python Batch — Hindi (Demo)', 'hindi', 'active');
+`).run(engagementId, instId, ctId, 'Python Fundamentals — Demo Batch', 'hindi', 'active');
 
-db.prepare(`
-  INSERT INTO engagements (id, institution_id, capability_target_id, title, language, status, started_at)
-  VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-`).run(engagementTeluguId, instId, ctId, 'Python Batch — Telugu (Demo)', 'telugu', 'active');
-
-// ─── 7. Enrol learners into engagements ──────────────────────────────────────
+// ─── 7. Enrol both learners into the single engagement ───────────────────────
 const el1Id = uuidv4();
 const el2Id = uuidv4();
 
 db.prepare(`
   INSERT INTO engagement_learners (id, engagement_id, learner_id, current_node_id, current_cluster_id, overall_status)
   VALUES (?, ?, ?, ?, ?, ?)
-`).run(el1Id, engagementHindiId, learner1Id, node1Id, cluster1Id, 'in_progress');
+`).run(el1Id, engagementId, learner1Id, node1Id, cluster1Id, 'in_progress');
 
 db.prepare(`
   INSERT INTO engagement_learners (id, engagement_id, learner_id, current_node_id, current_cluster_id, overall_status)
   VALUES (?, ?, ?, ?, ?, ?)
-`).run(el2Id, engagementTeluguId, learner2Id, node1Id, cluster1Id, 'in_progress');
+`).run(el2Id, engagementId, learner2Id, node1Id, cluster1Id, 'in_progress');
 
 db.close();
 
@@ -185,16 +181,19 @@ console.log('  Email    : demo@vak.ai');
 console.log('  Password : Demo@123');
 console.log('');
 console.log('═══════════════════════════════════════════════════════');
-console.log('  LEARNER LOGIN — Hindi');
+console.log('  LEARNER LOGIN — Hindi (Arjun Sharma)');
 console.log('───────────────────────────────────────────────────────');
 console.log('  URL           : http://localhost:3000/learner-login');
 console.log('  Learner Ref   : HINDI001');
-console.log('  Engagement ID :', engagementHindiId);
+console.log('  Engagement ID :', engagementId);
+console.log('  Language      : हिंदी (toggle available in app)');
 console.log('');
 console.log('═══════════════════════════════════════════════════════');
-console.log('  LEARNER LOGIN — Telugu');
+console.log('  LEARNER LOGIN — Telugu (Priya Reddy)');
 console.log('───────────────────────────────────────────────────────');
 console.log('  URL           : http://localhost:3000/learner-login');
 console.log('  Learner Ref   : TELUGU001');
-console.log('  Engagement ID :', engagementTeluguId);
+console.log('  Engagement ID :', engagementId);
+console.log('  Language      : తెలుగు (toggle available in app)');
+console.log('  NOTE          : Both learners use the SAME Engagement ID');
 console.log('═══════════════════════════════════════════════════════\n');

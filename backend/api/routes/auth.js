@@ -61,7 +61,8 @@ router.post('/learner/login', (req, res) => {
 
   const db = getDb();
   const data = db.prepare(`
-    SELECT l.*, el.id as el_id, el.engagement_id, e.language,
+    SELECT l.*, el.id as el_id, el.engagement_id,
+           l.language as language,
            el.current_node_id, el.overall_status
     FROM learners l
     JOIN engagement_learners el ON el.learner_id = l.id

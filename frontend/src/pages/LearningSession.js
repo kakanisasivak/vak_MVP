@@ -7,6 +7,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLang } from '../context/LangContext';
 import api from '../utils/api';
 
 const APPROACH_NAMES = {
@@ -19,6 +20,7 @@ const APPROACH_NAMES = {
 
 export default function LearningSession() {
   const { user } = useAuth();
+  const { lang, toggleLang, t } = useLang();
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
 
@@ -35,11 +37,6 @@ export default function LearningSession() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
-  const lang = user?.language || 'telugu';
-  const langName = lang === 'hindi' ? 'हिंदी' : 'తెలుగు';
-  const readyText = lang === 'hindi' ? 'मैं तैयार हूँ — परीक्षा लो' : 'నేను సిద్ధంగా ఉన్నాను — పరీక్షించు';
-  const sendText = lang === 'hindi' ? 'भेजें' : 'పంపు';
-
   // Start session on mount
   useEffect(() => {
     startSession();
@@ -52,7 +49,7 @@ export default function LearningSession() {
   const startSession = async () => {
     setLoading(true);
     try {
-      const res = await api.post('/learner/session/start');
+      const res = await api.post('/learner/session/start', { language: lang });
       setSessionId(res.data.session_id);
       setNodeLabel(res.data.node_label || '');
       setClusterLabel(res.data.cluster_label || '');
@@ -81,7 +78,8 @@ export default function LearningSession() {
     try {
       const res = await api.post(`/learner/session/${sessionId}/message`, {
         content: userMsg,
-        request_mastery_check: false
+        request_mastery_check: false,
+        language: lang
       });
       setMessages(prev => [...prev, { role: 'ai', content: res.data.message, type: res.data.message_type }]);
 
@@ -99,8 +97,9 @@ export default function LearningSession() {
     setLoading(true);
     try {
       const res = await api.post(`/learner/session/${sessionId}/message`, {
-        content: lang === 'hindi' ? 'मैं समझ गया हूँ, परीक्षा लो' : 'నేను అర్థం చేసుకున్నాను, పరీక్షించు',
-        request_mastery_check: true
+        content: t.masteryRequest,
+        request_mastery_check: true,
+        language: lang
       });
       setMessages(prev => [...prev, { role: 'ai', content: res.data.message, type: 'mastery_check' }]);
       setMasteryQuestion(res.data.mastery_check_question || res.data.message);
@@ -121,40 +120,37 @@ export default function LearningSession() {
     try {
       const res = await api.post(`/learner/session/${sessionId}/mastery-check`, {
         question: masteryQuestion,
-        learner_response: answer
+        learner_response: answer,
+        language: lang
       });
 
       if (res.data.result === 'advance') {
         setMessages(prev => [...prev, {
           role: 'ai',
           content: res.data.feedback + (res.data.programme_complete
-            ? (lang === 'hindi' ? '\n\n🎓 आपने सभी कौशल पूरे कर लिए हैं!' : '\n\n🎓 మీరు అన్ని నైపుణ్యాలు పూర్తి చేశారు!')
-            : (lang === 'hindi' ? `\n\n✅ आगे बढ़ते हैं: ${res.data.next_node?.label}` : `\n\n✅ ముందుకు వెళ్దాం: ${res.data.next_node?.label}`)),
+            ? `\n\n🎓 ${t.completedAll ? '' : ''}${lang === 'hindi' ? 'आपने सभी कौशल पूरे कर लिए हैं!' : 'మీరు అన్ని నైపుణ్యాలు పూర్తి చేశారు!'}`
+            : `\n\n${t.completedAll(res.data.next_node?.label || '')}`),
           type: 'advance_trigger'
         }]);
         setResult({ ...res.data, type: 'advance' });
         setPhase('result');
       } else {
-        // Loop — try different approach
         setMessages(prev => [...prev, {
           role: 'ai',
-          content: res.data.feedback + '\n\n' + (lang === 'hindi'
-            ? `चलिए एक अलग तरीके से समझते हैं। नया तरीका: ${APPROACH_NAMES[res.data.next_approach] || res.data.next_approach}`
-            : `వేరే విధంగా అర్థం చేసుకుందాం। కొత్త పద్ధతి: ${APPROACH_NAMES[res.data.next_approach] || res.data.next_approach}`),
+          content: res.data.feedback + '\n\n' + t.loopMsg(APPROACH_NAMES[res.data.next_approach] || res.data.next_approach),
           type: 'loop_trigger'
         }]);
         setPhase('instruction');
         setLoopCount(res.data.loop_count);
         setApproach(res.data.next_approach);
 
-        // Auto-start new session with new approach
         setTimeout(async () => {
           if (res.data.new_session_id) {
             setSessionId(res.data.new_session_id);
-            // Load instruction for new approach
             const nextRes = await api.post(`/learner/session/${res.data.new_session_id}/message`, {
-              content: lang === 'hindi' ? 'फिर से शुरू करें' : 'మళ్ళీ మొదలుపెట్టు',
-              request_mastery_check: false
+              content: t.resumeLearning,
+              request_mastery_check: false,
+              language: lang
             });
             setMessages(prev => [...prev, { role: 'ai', content: nextRes.data.message, type: 'instruction' }]);
           }
@@ -190,16 +186,14 @@ export default function LearningSession() {
         </div>
         <div style={S.headerRight}>
           <div style={S.approachBadge}>{APPROACH_NAMES[approach]}</div>
-          <div style={S.langBadge}>{langName}</div>
+          <button style={S.langToggle} onClick={toggleLang}>{t.switchLang}</button>
           {loopCount > 0 && <div style={S.loopBadge}>Loop {loopCount}</div>}
         </div>
       </div>
 
       {/* Phase indicator */}
       {phase === 'mastery_check' && (
-        <div style={S.checkBanner}>
-          {lang === 'hindi' ? '📝 मास्टरी चेक — अपना उत्तर लिखें' : '📝 మాస్టరీ చెక్ — మీ సమాధానం రాయండి'}
-        </div>
+        <div style={S.checkBanner}>{t.masteryCheckBanner}</div>
       )}
 
       {/* Messages */}
@@ -225,7 +219,7 @@ export default function LearningSession() {
           <div style={S.msgWrap}>
             <div style={{ ...S.bubble, background: '#1E293B' }}>
               <div style={S.aiLabel}>VAK</div>
-              <div style={S.typing}><span/><span/><span/></div>
+              <div className="typing"><span /><span /><span /></div>
             </div>
           </div>
         )}
@@ -237,7 +231,7 @@ export default function LearningSession() {
         <div style={S.inputArea}>
           {phase === 'instruction' && (
             <button style={S.readyBtn} onClick={requestMasteryCheck} disabled={loading || messages.length < 2}>
-              {readyText}
+              {t.readyBtn}
             </button>
           )}
           <div style={S.inputRow}>
@@ -246,15 +240,12 @@ export default function LearningSession() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={phase === 'mastery_check'
-                ? (lang === 'hindi' ? 'अपना उत्तर यहाँ लिखें…' : 'మీ సమాధానం ఇక్కడ రాయండి…')
-                : (lang === 'hindi' ? 'अपना प्रश्न या उत्तर लिखें…' : 'మీ ప్రశ్న లేదా సమాధానం రాయండి…')
-              }
+              placeholder={phase === 'mastery_check' ? t.answerPlaceholder : t.inputPlaceholder}
               rows={3}
               disabled={loading}
             />
             <button style={S.sendBtn} onClick={phase === 'mastery_check' ? submitMasteryAnswer : sendMessage} disabled={loading || !input.trim()}>
-              {sendText}
+              {t.sendBtn}
             </button>
           </div>
         </div>
@@ -262,21 +253,19 @@ export default function LearningSession() {
         <div style={S.resultArea}>
           {result?.programme_complete ? (
             <div style={S.completeResult}>
-              🎓 {lang === 'hindi' ? 'कार्यक्रम पूरा!' : 'కార్యక్రమం పూర్తయింది!'}
+              {t.programComplete}
               <button style={S.dashBtn} onClick={() => navigate('/learn/dashboard')}>
-                {lang === 'hindi' ? 'डैशबोर्ड पर जाएं' : 'డాష్‌బోర్డ్‌కి వెళ్ళండి'}
+                {t.goToDashboard}
               </button>
             </div>
           ) : (
             <div style={S.advanceResult}>
-              <div style={{ color: '#10B981', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
-                ✅ {lang === 'hindi' ? 'आगे बढ़ें' : 'ముందుకు వెళ్ళండి'}
-              </div>
+              <div style={{ color: '#10B981', fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{t.advanceLabel}</div>
               <div style={{ color: '#94A3B8', fontSize: 14, marginBottom: 16 }}>
-                {lang === 'hindi' ? 'अगला कौशल:' : 'తదుపరి నైపుణ్యం:'} <strong style={{ color: '#60A5FA' }}>{result?.next_node?.label}</strong>
+                {t.nextSkillLabel} <strong style={{ color: '#60A5FA' }}>{result?.next_node?.label}</strong>
               </div>
               <button style={S.nextBtn} onClick={() => { setPhase('instruction'); startSession(); }}>
-                {lang === 'hindi' ? 'अगला कौशल शुरू करें →' : 'తదుపరి నైపుణ్యం మొదలుపెట్టండి →'}
+                {t.nextSkillBtn}
               </button>
             </div>
           )}
@@ -302,7 +291,7 @@ const S = {
   clusterTitle: { color: '#64748B', fontSize: 12 },
   headerRight: { display: 'flex', gap: 8, alignItems: 'center' },
   approachBadge: { background: '#1E3A5F', color: '#60A5FA', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
-  langBadge: { background: '#0F3A2A', color: '#10B981', padding: '4px 12px', borderRadius: 20, fontSize: 14, fontWeight: 600 },
+  langToggle: { background: '#0F3A2A', color: '#10B981', border: '1px solid #10B98144', padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   loopBadge: { background: '#2A1A0A', color: '#FBBF24', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
   checkBanner: { background: '#1A1A3A', borderBottom: '1px solid #6D28D9', padding: '10px 20px', color: '#C4B5FD', fontSize: 14, fontWeight: 600, flexShrink: 0 },
   chatArea: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 },
@@ -311,7 +300,6 @@ const S = {
   bubble: { maxWidth: '80%', padding: '14px 18px', lineHeight: 1 },
   aiLabel: { color: '#3B82F6', fontSize: 10, fontWeight: 700, letterSpacing: 2, marginBottom: 6 },
   msgText: { fontSize: 15, lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
-  typing: { display: 'flex', gap: 3, padding: '4px 0' },
   inputArea: { background: '#1E293B', borderTop: '1px solid #334155', padding: '12px 16px', flexShrink: 0 },
   readyBtn: { width: '100%', background: '#1A1A3A', border: '1px solid #6D28D9', color: '#C4B5FD', padding: '10px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 8 },
   inputRow: { display: 'flex', gap: 8, alignItems: 'flex-end' },

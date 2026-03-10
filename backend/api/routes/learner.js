@@ -96,10 +96,11 @@ router.post('/session/start', async (req, res) => {
   // Generate first instruction if no history
   if (history.length === 0) {
     try {
+      const lang = req.body.language || req.user.language;
       const instruction = await generateInstruction({
         nodeLabel: node.node_label,
         clusterLabel: node.cluster_label,
-        language: req.user.language,
+        language: lang,
         approach: session.explanation_approach,
         conversationHistory: [],
         loopCount: session.loop_count
@@ -141,7 +142,7 @@ router.post('/session/start', async (req, res) => {
 
 // ─── Send a learner message and get AI response ───────────────────────────────
 router.post('/session/:sessionId/message', async (req, res) => {
-  const { content, request_mastery_check } = req.body;
+  const { content, request_mastery_check, language: bodyLang } = req.body;
   if (!content) return res.status(400).json({ error: 'content required' });
 
   const db = getDb();
@@ -167,12 +168,13 @@ router.post('/session/:sessionId/message', async (req, res) => {
   try {
     let aiResponse;
 
+    const lang = bodyLang || req.user.language;
     if (request_mastery_check) {
       // Learner is ready to be checked
       aiResponse = await generateMasteryCheck({
         nodeLabel: node.node_label,
         clusterLabel: node.cluster_label,
-        language: req.user.language,
+        language: lang,
         conversationHistory: [...history, { role: 'learner', content }]
       });
     } else {
@@ -180,7 +182,7 @@ router.post('/session/:sessionId/message', async (req, res) => {
       aiResponse = await generateInstruction({
         nodeLabel: node.node_label,
         clusterLabel: node.cluster_label,
-        language: req.user.language,
+        language: lang,
         approach: session.explanation_approach,
         conversationHistory: [...history, { role: 'learner', content }],
         loopCount: session.loop_count
@@ -207,7 +209,7 @@ router.post('/session/:sessionId/message', async (req, res) => {
 
 // ─── Submit mastery check answer ──────────────────────────────────────────────
 router.post('/session/:sessionId/mastery-check', async (req, res) => {
-  const { question, learner_response } = req.body;
+  const { question, learner_response, language: bodyLang } = req.body;
   if (!question || !learner_response) {
     return res.status(400).json({ error: 'question and learner_response required' });
   }
@@ -227,7 +229,7 @@ router.post('/session/:sessionId/mastery-check', async (req, res) => {
   try {
     const evaluation = await evaluateMasteryResponse({
       nodeLabel: node.node_label,
-      language: req.user.language,
+      language: bodyLang || req.user.language,
       question,
       learnerResponse: learner_response
     });
