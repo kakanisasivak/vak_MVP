@@ -9,10 +9,27 @@
 // - Loop uses a DIFFERENT approach each time — never repeats same explanation
 // ─────────────────────────────────────────────────────────────────────────────
 
-const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+// ─── Gemini API helper ────────────────────────────────────────────────────────
+async function callGemini(systemPrompt, messages, maxOutputTokens = 1024) {
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: systemPrompt,
+    generationConfig: { maxOutputTokens }
+  });
+
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+
+  const result = await model.generateContent({ contents });
+  return result.response.text();
+}
 
 // ─── Language system prompts ──────────────────────────────────────────────────
 const LANGUAGE_CONTEXTS = {
@@ -147,14 +164,7 @@ async function generateInstruction({
     { role: 'user', content: userMessage }
   ];
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages
-  });
-
-  const text = response.content[0].text;
+  const text = await callGemini(systemPrompt, messages, 1024);
   try {
     return JSON.parse(text);
   } catch {
@@ -186,14 +196,7 @@ async function generateMasteryCheck({ nodeLabel, clusterLabel, language, convers
     }
   ];
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 512,
-    system: systemPrompt,
-    messages
-  });
-
-  const text = response.content[0].text;
+  const text = await callGemini(systemPrompt, messages, 512);
   try {
     const parsed = JSON.parse(text);
     return parsed;
@@ -219,19 +222,12 @@ async function evaluateMasteryResponse({
 }) {
   const systemPrompt = buildEvaluatorSystemPrompt(language, nodeLabel);
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 512,
-    system: systemPrompt,
-    messages: [
-      {
-        role: 'user',
-        content: `Mastery check question: "${question}"\n\nLearner's response: "${learnerResponse}"\n\nEvaluate this response for the skill node "${nodeLabel}".`
-      }
-    ]
-  });
-
-  const text = response.content[0].text;
+  const text = await callGemini(systemPrompt, [
+    {
+      role: 'user',
+      content: `Mastery check question: "${question}"\n\nLearner's response: "${learnerResponse}"\n\nEvaluate this response for the skill node "${nodeLabel}".`
+    }
+  ], 512);
   try {
     return JSON.parse(text);
   } catch {
@@ -277,18 +273,13 @@ Respond ONLY with JSON:
   "cluster_summary": "Brief description of what this cluster builds"
 }`;
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages: [{
-      role: 'user',
-      content: `Cluster: "${clusterLabel}"\nDescription: "${clusterDescription || 'As specified in the capability target'}"\nRequired proficiency level: "${proficiencyLevel || 'intermediate'}"\nTarget language: ${ctx.lang_name}`
-    }]
-  });
+  const text = await callGemini(systemPrompt, [{
+    role: 'user',
+    content: `Cluster: "${clusterLabel}"\nDescription: "${clusterDescription || 'As specified in the capability target'}"\nRequired proficiency level: "${proficiencyLevel || 'intermediate'}"\nTarget language: ${ctx.lang_name}`
+  }], 2048);
 
   try {
-    return JSON.parse(response.content[0].text);
+    return JSON.parse(text);
   } catch {
     return { nodes: [], total_estimated_minutes: 0, cluster_summary: '' };
   }
@@ -329,15 +320,12 @@ Respond ONLY with JSON:
   "confirmation_summary": "A clear summary to send to the client for confirmation before instruction begins"
 }`;
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2048,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: `Extract capability targets from this input:\n\n${rawInput}` }]
-  });
+  const text = await callGemini(systemPrompt, [
+    { role: 'user', content: `Extract capability targets from this input:\n\n${rawInput}` }
+  ], 2048);
 
   try {
-    return JSON.parse(response.content[0].text);
+    return JSON.parse(text);
   } catch {
     return { clusters: [], extraction_confidence: 0, ambiguities: [], confirmation_summary: '' };
   }
