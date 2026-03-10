@@ -1,0 +1,19 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.tabSize": 2,
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.git": false,
+    "**/vak.db": false
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/build": true
+  },
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "javascript.preferences.quoteStyle": "single",
+  "emmet.includeLanguages": {
+    "javascript": "javascriptreact"
+  }
+}
